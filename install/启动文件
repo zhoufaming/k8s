@@ -1,0 +1,73 @@
+主节点：
+cat kube-apiserver.service
+[Unit]
+Description=Kubernetes API Server
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+After=network.target
+[Service]
+EnvironmentFile=-/etc/kubernetes/apiserver
+ExecStart=/opt/kubernetes/server/bin/kube-apiserver $KUBE_API_ARGS
+Restart=on-failure
+Type=notify
+LimitNOFILE=65536
+[Install]
+WantedBy=multi-user.target
+
+cat kube-controller-manager.service
+[Unit]
+Description=Kubernetes Controller Manager
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+[Service]
+EnvironmentFile=-/etc/kubernetes/controller-manager
+ExecStart=/opt/kubernetes/server/bin/kube-controller-manager $KUBE_CONTROLLER_MANAGER_ARGS
+Restart=on-failure
+LimitNOFILE=65536
+[Install]
+WantedBy=multi-user.target
+
+ cat kube-scheduler.service
+[Unit]
+Description=Kubernetes Scheduler Plugin
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+[Service]
+EnvironmentFile=-/etc/kubernetes/scheduler
+ExecStart=/opt/kubernetes/server/bin/kube-scheduler $KUBE_SCHEDULER_ARGS
+Restart=on-failure
+LimitNOFILE=65536
+[Install]
+WantedBy=multi-user.target
+
+从节点：
+cat kubelet.service
+[Unit]
+Description=Kubernetes Kubelet
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+After=docker.service
+Requires=docker.service
+
+[Service]
+WorkingDirectory=/var/lib/kubelet
+EnvironmentFile=-/etc/kubernetes/kubelet
+ExecStart=/opt/kubernetes/node/bin/kubelet $KUBELET_ARGS
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+
+
+ cat kube-proxy.service
+[Unit]
+Description=Kubernetes Kube-Proxy Server
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+After=network.target
+[Service]
+WorkingDirectory=/var/lib/kube-proxy
+EnvironmentFile=-/etc/kubernetes/proxy
+ExecStart=/opt/kubernetes/node/bin/kube-proxy $KUBE_PROXY_ARGS
+
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
