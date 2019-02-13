@@ -1,0 +1,48 @@
+主节点：
+ cat /etc/kubernetes/apiserver 
+KUBE_API_ARGS="--storage-backend=etcd3 \
+--etcd-servers=http://192.168.151.41:2379,http://192.168.151.59:2379,http://192.168.151.72:2379 \
+--insecure-bind-address=0.0.0.0 \
+--insecure-port=8080 \
+--service-cluster-ip-range=172.16.0.0/16 \
+--service-node-port-range=1025-65535 \
+--logtostderr=false --log-dir=/var/log/kubernets --v=2 \
+--admission-control=NamespaceLifecycle,LimitRanger,ResourceQuota"
+
+cat /etc/kubernetes/controller-manager
+KUBE_CONTROLLER_MANAGER_ARGS="--master=http://127.0.0.1:8080 --logtostderr=false --log-dir=/var/log/kubernets --v=2"
+
+ cat /etc/kubernetes/scheduler
+KUBE_SCHEDULER_ARGS="--master=http://127.0.0.1:8080 --logtostderr=false --log-dir=/var/log/kubernets --v=2"
+
+从节点：
+当前目录 /etc/kubernetes/
+cat kubelet
+KUBELET_ARGS="--kubeconfig=/etc/kubernetes/kubelet.kubeconfig \
+--cluster-dns=172.16.255.254 \
+--hostname-override=192.168.151.59 \
+--logtostderr=false \
+--log-dir=/var/log/kubernets \
+--v=2 \
+--pod-infra-container-image=192.168.151.47/library/pause-amd64:3.0"
+
+cat proxy
+KUBE_PROXY_ARGS="--master=http://192.168.151.41:8080 \
+--hostname-override=192.168.151.59 \
+--v=2 \
+--logtostderr=false \
+--log-dir=/var/log/kubernets"
+
+cat kubelet.kubeconfig
+apiVersion: v1
+clusters:
+- cluster:
+    server: http://192.168.151.41:8080
+  name: kubernetes
+contexts:
+- context:
+    cluster: kubernetes
+  name: default
+current-context: default
+kind: Config
+preferences: {}
