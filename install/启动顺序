@@ -1,1 +1,2 @@
 
+etcd->flannel -> docker -> kubelet -> kube-proxy的顺序启动
