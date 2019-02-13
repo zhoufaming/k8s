@@ -1,0 +1,16 @@
+主节点：
+/etc/kubernetes
+
+/var/log/kubernets 
+
+
+
+从节点：
+
+/etc/kubernetes
+
+/var/log/kubernets
+
+/var/lib/kubelet
+
+/var/lib/kube-proxy
