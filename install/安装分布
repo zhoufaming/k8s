@@ -1,0 +1,9 @@
+master 192.168.151.41
+所需组件：  flannel etcd 
+/etc/kubernetes/
+配置文件：  apiserver controller-manager scheduler
+
+node    192.168.151.59 192.168.151.72
+所需组件： flannel etcd docker
+/etc/kubernetes/
+配置文件：kubelet proxy  kubelet.kubeconfig
