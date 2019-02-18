@@ -1,0 +1,20 @@
+代码位于kubernetes/cmd/kube-scheduler/scheduler.go
+
+func main() {
+	rand.Seed(time.Now().UnixNano())
+
+	command := app.NewSchedulerCommand()  //实际调用的初始化
+
+	// TODO: once we switch everything over to Cobra commands, we can go back to calling
+	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
+	// normalize func and add the go flag set by hand.
+	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
+	// utilflag.InitFlags()
+	logs.InitLogs()//日主初始化
+	defer logs.FlushLogs()//刷新日志
+
+	if err := command.Execute(); err != nil {//执行
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+}
