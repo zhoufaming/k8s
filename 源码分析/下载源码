@@ -1,3 +1,16 @@
-git clone https://github.com/kubernetes/kubernetes.git
+wget https://codeload.github.com/kubernetes/kubernetes/tar.gz/v1.12.1
+mv v1.12.1 v1.12.1.tar.gz
+mkdir $GOPATH/src/k8s.io/
+tar -C /root/go/src/k8s.io -xvzf v1.12.1.tar.gz
+cd $GOPATH/src/k8s.io/
+mv kubernetes-1.12.1 kubernetes
+
+或者
+git clone https://github.com/kubernetes/kubernetes.git  
 cd kubernetes
 make
+
+或者：
+$ go get -d k8s.io/kubernetes
+$ cd $GOPATH/src/k8s.io/kubernetes
+$ make
