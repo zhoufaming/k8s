@@ -1,0 +1,8 @@
+yum install gcc
+/root/go/src/k8s.io/kubernetes/hack/generate-docs.sh
+修改generate-docs.sh脚本中$(dirname "KUBE_ROOT=${BASH_SOURCE}")/..值为
+KUBE_ROOT=/root/go/src/k8s.io/kubernetes/ 对应kubernetes源码实际所在路径
+
+cd  /root/go/src/k8s.io/kubernetes/hack/
+./generate-docs.sh
+执行完即可获取完整帮助文档
