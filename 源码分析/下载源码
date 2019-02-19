@@ -14,3 +14,7 @@ make
 $ go get -d k8s.io/kubernetes
 $ cd $GOPATH/src/k8s.io/kubernetes
 $ make
+
+
+编译后的文件存储在
+$GOPATH/src/k8s.io/kubernetes/_output/local/bin/linux/amd64
