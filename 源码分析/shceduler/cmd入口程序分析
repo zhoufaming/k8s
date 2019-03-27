@@ -1,4 +1,5 @@
 代码位于kubernetes/cmd/kube-scheduler/scheduler.go
+这是main()入口，它在调用调度器框架之前进行初始化
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
