@@ -1,0 +1,65 @@
+由flannel到calico要清理环境，注意选择性删除文件：
+systemctl stop kubelet
+systemctl stop docker
+ifconfig tunl0 down
+ifconfig docker0 down
+ip link delete tunl0
+ip link delete docker0
+ip link delete flannel.1
+rmmod ipip
+rm -rf /var/lib/cni/
+rm -rf /etc/cni/
+rm -rf /var/lib/kubelet/
+rm -rf /var/lib/docker
+umount /var/run/docker/netns/default
+rm -rf /var/run/docker
+/opt/kubernetes/node/bin/kubelet
+systemctl restart kubelet
+systemctl restart docker
+ifconfig
+
+下载yaml文件：
+wget https://docs.projectcalico.org/v3.2/getting-started/kubernetes/installation/rbac.yaml
+wget https://docs.projectcalico.org/v3.6/getting-started/kubernetes/installation/hosted/calico.yaml
+
+修改文件：
+sed -i 's@.*etcd_endpoints:.*@\ \ etcd_endpoints:\ \"https://172.20.11.39:2379,https://172.20.11.38:2379,https://172.20.11.52:2379\"@gi' calico.yaml
+
+
+export ETCD_CERT=`cat /etc/etcd/cert/etcd.pem | base64 | tr -d '\n'` 
+
+export ETCD_KEY=`cat /etc/etcd/cert/etcd-key.pem | base64 | tr -d '\n'` 
+
+export ETCD_CA=`cat /etc/kubernetes/cert/ca.pem | base64 | tr -d '\n'`
+
+
+sed -i 's@.*etcd_ca:.*@\ \ etcd_ca:\ "/calico-secrets/etcd-ca"@gi' calico.yaml 
+
+sed -i 's@.*etcd_cert:.*@\ \ etcd_cert:\ "/calico-secrets/etcd-cert"@gi' calico.yaml 
+
+sed -i 's@.*etcd_key:.*@\ \ etcd_key:\ "/calico-secrets/etcd-key"@gi' calico.yaml 
+
+sed -i "s@.*etcd-cert:.*@\ \ etcd-cert:\ ${ETCD_CERT}@gi" calico.yaml 
+
+sed -i "s@.*etcd-key:.*@\ \ etcd-key:\ ${ETCD_KEY}@gi" calico.yaml 
+
+sed -i "s@.*etcd-ca:.*@\ \ etcd-ca:\ ${ETCD_CA}@gi" calico.yaml 
+
+
+注意点：
+CALICO_IPV4POOL_IPIP：是否启用IPIP模式，启用IPIP模式时，Calico将在node上创建一个tunl0的虚拟隧道 不启用则改成Off
+
+修改kubelet启动参数：
+ 设置各node上Kubelet服务的启动参数： --network-plugin=cni， 可能还要加上这两个参数：
+
+      --cni-conf-dir  CNI插件的配置文件目录，默认为/etc/cni/net.d 该目录下的配置文件内容需要符合CNI规范
+
+      --cni-bin-dir： CNI插件的可执行文件目录，默认为/opt/cni/bin
+
+   设置 master上的kube-apiserver服务的启动参数: --allow-privileged=true (因为calico-node需要以特权模式运行在各node上)
+
+   设置好后，重新启动kubelet。
+   
+  部署：
+    kubectl apply -f rbac.yaml
+    kubectl apply -f calico.yaml
