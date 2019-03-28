@@ -1,0 +1,52 @@
+Job负责批处理任务，即仅执行一次的任务，它保证批处理任务的一个或多个Pod成功结束。
+
+Job不需要选择器，其中的pod也不需要标签，系统在创建Job时会自动添加相关内容。当然用户也可以出于资源组织的目的添加标签，但这个与Job本身的实现没有关系
+spec.template格式同Pod
+RestartPolicy仅支持Never或OnFailure
+单个Pod时，默认Pod成功运行后Job即结束
+.spec.completions 标志Job结束需要成功运行的Pod个数，默认为1
+.spec.parallelism 标志并行运行的Pod的个数，默认为1，--允许的最大并发数
+spec.activeDeadlineSeconds 标志失败Pod的重试最大时间，超过这个时间不会继续重试
+backoffLimit字段 允许pod失败的次数
+
+非并发Job：
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pi
+spec:
+  completions: 1
+  parallelism: 1
+  template:
+    metadata:
+      name: pi
+    spec:
+      containers:
+        - name: pi
+          image: perl
+          command: ["perl", "-Mbignum=bpi", "-wle", "print bpi(2000)"]
+      restartPolicy: Never
+  backoffLimit: 4
+  
+粗并发Job--需要pod成功8次，但在同一时间，只允许有两个pod并发。一个成功结束后，再启动另一个。：
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pi
+spec:
+  completions: 8
+  parallelism: 2
+  template:
+    metadata:
+      name: pi
+    spec:
+      containers:
+        - name: pi
+          image: perl
+          command: ["perl", "-Mbignum=bpi", "-wle", "print bpi(2000)"]
+      restartPolicy: OnFailure
+  backoffLimit: 4
+  
+  细并发Job--少创建pod只定义并发数，pod要自己决定退出条件，否者永远无法结束
+
+Job创建的pod在结束运行后，无论是成功还是失败，不会默认删除，仍然保留在系统中
