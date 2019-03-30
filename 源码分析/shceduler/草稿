@@ -1,0 +1,12 @@
+k8s.io/apiserver/pkg/server/options  可能是启动参数以及检验
+/root/go/src/k8s.io/kubernetes/cmd/kube-scheduler/app/options/options.go 包含主节点信息以及所有scheduler运行的参数
+
+
+scheduler的一些状态、常量信息如默认的调度策略
+/root/go/src/k8s.io/kubernetes/pkg/scheduler/apis/config/types.go
+
+
+//跟api yaml中字段有关、有常量命名空间、状态类型如alreadyexit
+/root/go/src/k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apis/meta/v1/types.go 
+
+/usr/local/GoLand-2018.3.4/plugins/go/lib/dlv/linux/dlv --listen=localhost:10251 --headless=true --api-version=2 exec /root/go_build_scheduler_go -- --address=127.0.0.1 --logtostderr=false --log-dir=/var/log/kubernets --v=2 --kubeconfig=/etc/kubernetes/kube-scheduler.kubeconfig
