@@ -6,6 +6,8 @@ cd $GOPATH/src/k8s.io/
 mv kubernetes-1.12.1 kubernetes
 
 或者
+mkdir $GOPATH/src/k8s.io/
+cd mkdir $GOPATH/src/k8s.io/
 git clone https://github.com/kubernetes/kubernetes.git  
 cd kubernetes
 make
