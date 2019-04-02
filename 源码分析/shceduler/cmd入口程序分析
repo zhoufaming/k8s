@@ -72,8 +72,233 @@ through the API as necessary.`,
 		},
 	}
 
-	opts.AddFlags(cmd.Flags())
+	opts.AddFlags(cmd.Flags())cmd flags初始化以及添加flags
 	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
-
 	return cmd
 }
+
+    进入opts, err := options.NewOptions()查看具体代码：
+    func NewOptions() (*Options, error) {
+        cfg, err := newDefaultComponentConfig()//初始化配置参数
+        if err != nil {
+            return nil, err
+        }
+    
+        hhost, hport, err := splitHostIntPort(cfg.HealthzBindAddress)//cfg.HealthzBindAddress=0.0.0.0:10251,分离地址和端口
+        if err != nil {
+            return nil, err
+        }
+    
+        o := &Options{
+            ComponentConfig: *cfg,
+            SecureServing:   nil, // TODO: enable with apiserveroptions.NewSecureServingOptions()
+            CombinedInsecureServing: &CombinedInsecureServingOptions{//绑定不安全的服务
+                Healthz: &apiserveroptions.DeprecatedInsecureServingOptions{
+                    BindNetwork: "tcp",
+                },
+                Metrics: &apiserveroptions.DeprecatedInsecureServingOptions{
+                    BindNetwork: "tcp",
+                },
+                BindPort:    hport,//10251
+                BindAddress: hhost,//0.0.0.0
+            },
+            Authentication: nil, // TODO: enable with apiserveroptions.NewDelegatingAuthenticationOptions()
+            Authorization:  nil, // TODO: enable with apiserveroptions.NewDelegatingAuthorizationOptions()
+            Deprecated: &DeprecatedOptions{//弃用的options和flags
+                UseLegacyPolicyConfig:    false,
+                PolicyConfigMapNamespace: metav1.NamespaceSystem,//默认值kube-system
+            },
+        }
+    
+        return o, nil
+    }
+    
+    
+    func newDefaultComponentConfig() (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
+        cfgv1alpha1 := kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration{}//生成一个结构体数据-配置调度器
+        kubeschedulerscheme.Scheme.Default(&cfgv1alpha1)//初始化
+        cfg := kubeschedulerconfig.KubeSchedulerConfiguration{}//生成一个结构体数据-配置调度器
+        if err := kubeschedulerscheme.Scheme.Convert(&cfgv1alpha1, &cfg, nil); err != nil {////初始化
+            return nil, err
+        }
+        return &cfg, nil//cfg包含了一系列参数 如绑定的本地地址以及端口10251、绑定超时时间，调度器名称。
+    }
+
+进入command.Execute()查看具体代码：
+func (c *Command) Execute() error {
+	_, err := c.ExecuteC()
+	return err
+}
+func (c *Command) ExecuteC() (cmd *Command, err error) {
+	// Regardless of what command execute is called on, run on Root only
+	if c.HasParent() {//为空
+		return c.Root().ExecuteC()
+	}
+
+	// windows hook
+	if preExecHookFn != nil {
+		preExecHookFn(c)
+	}
+
+	// initialize help as the last point possible to allow for user
+	// overriding
+	c.InitDefaultHelpCmd()
+
+	var args []string
+
+	// Workaround FAIL with "go test -v" or "cobra.test -test.v", see #155
+	if c.args == nil && filepath.Base(os.Args[0]) != "cobra.test" {
+		args = os.Args[1:]//获取终端中传进来的参数
+	} else {
+		args = c.args
+	}
+
+	var flags []string
+	if c.TraverseChildren {
+		cmd, flags, err = c.Traverse(args)
+	} else {
+		cmd, flags, err = c.Find(args)//传入命令端的中的options
+	}
+	if err != nil {
+		// If found parse to a subcommand and then failed, talk about the subcommand
+		if cmd != nil {
+			c = cmd
+		}
+		if !c.SilenceErrors {
+			c.Println("Error:", err.Error())
+			c.Printf("Run '%v --help' for usage.\n", c.CommandPath())
+		}
+		return c, err
+	}
+
+	cmd.commandCalledAs.called = true
+	if cmd.commandCalledAs.name == "" {
+		cmd.commandCalledAs.name = cmd.Name()//kube-scheduler
+	}
+
+	err = cmd.execute(flags)//执行相应的参数
+	if err != nil {
+		// Always show help if requested, even if SilenceErrors is in
+		// effect
+		if err == flag.ErrHelp {
+			cmd.HelpFunc()(cmd, args)
+			return cmd, nil
+		}
+
+		// If root command has SilentErrors flagged,
+		// all subcommands should respect it
+		if !cmd.SilenceErrors && !c.SilenceErrors {
+			c.Println("Error:", err.Error())
+		}
+
+		// If root command has SilentUsage flagged,
+		// all subcommands should respect it
+		if !cmd.SilenceUsage && !c.SilenceUsage {
+			c.Println(cmd.UsageString())
+		}
+	}
+	return cmd, err
+}
+
+运行调度器:
+func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error {
+	// To help debugging, immediately log version
+	glog.Infof("Version: %+v", version.Get())
+
+	// Apply algorithms based on feature gates.
+	// TODO: make configurable?
+	algorithmprovider.ApplyFeatureGates()
+
+	// Configz registration.
+	if cz, err := configz.New("componentconfig"); err == nil {
+		cz.Set(c.ComponentConfig)
+	} else {
+		return fmt.Errorf("unable to register configz: %s", err)
+	}
+
+	// Build a scheduler config from the provided algorithm source.
+	schedulerConfig, err := NewSchedulerConfig(c）
+	if err != nil {
+		return err
+	}
+
+	// Create the scheduler.
+	sched := scheduler.NewFromConfig(schedulerConfig)
+
+	// Prepare the event broadcaster.
+	if c.Broadcaster != nil && c.EventClient != nil {
+		c.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.EventClient.Events("")})
+	}
+
+	// Start up the healthz server.
+	if c.InsecureServing != nil {
+		separateMetrics := c.InsecureMetricsServing != nil
+		handler := buildHandlerChain(newHealthzHandler(&c.ComponentConfig, separateMetrics), nil, nil)
+		if err := c.InsecureServing.Serve(handler, 0, stopCh); err != nil {
+			return fmt.Errorf("failed to start healthz server: %v", err)
+		}
+	}
+	if c.InsecureMetricsServing != nil {
+		handler := buildHandlerChain(newMetricsHandler(&c.ComponentConfig), nil, nil)
+		if err := c.InsecureMetricsServing.Serve(handler, 0, stopCh); err != nil {
+			return fmt.Errorf("failed to start metrics server: %v", err)
+		}
+	}
+	if c.SecureServing != nil {
+		handler := buildHandlerChain(newHealthzHandler(&c.ComponentConfig, false), c.Authentication.Authenticator, c.Authorization.Authorizer)
+		if err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
+			// fail early for secure handlers, removing the old error loop from above
+			return fmt.Errorf("failed to start healthz server: %v", err)
+		}
+	}
+
+	// Start all informers.
+	go c.PodInformer.Informer().Run(stopCh)
+	c.InformerFactory.Start(stopCh)
+
+	// Wait for all caches to sync before scheduling.
+	c.InformerFactory.WaitForCacheSync(stopCh)
+	controller.WaitForCacheSync("scheduler", stopCh, c.PodInformer.Informer().HasSynced)
+
+	// Prepare a reusable run function.
+	run := func(ctx context.Context) {
+		sched.Run()
+		<-ctx.Done()
+	}
+
+	ctx, cancel := context.WithCancel(context.TODO()) // TODO once Run() accepts a context, it should be used here
+	defer cancel()
+
+	go func() {
+		select {
+		case <-stopCh:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
+	// If leader election is enabled, run via LeaderElector until done and exit.
+	if c.LeaderElection != nil {
+		c.LeaderElection.Callbacks = leaderelection.LeaderCallbacks{
+			OnStartedLeading: run,
+			OnStoppedLeading: func() {
+				utilruntime.HandleError(fmt.Errorf("lost master"))
+			},
+		}
+		leaderElector, err := leaderelection.NewLeaderElector(*c.LeaderElection)
+		if err != nil {
+			return fmt.Errorf("couldn't create leader elector: %v", err)
+		}
+
+		leaderElector.Run(ctx)
+
+		return fmt.Errorf("lost lease")
+	}
+
+	// Leader election is disabled, so run inline until done.
+	run(ctx)
+	return fmt.Errorf("finished without leader elect")
+}
+
+
+
