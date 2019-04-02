@@ -1,5 +1,5 @@
 代码位于kubernetes/cmd/kube-scheduler/scheduler.go
-这是main()入口，它在调用调度器框架之前进行初始化
+这是main()入口，它在调用调度器框架之前进行初始化，主要用于命令行参数的解析和参数校验：
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
@@ -18,4 +18,62 @@ func main() {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
+}
+
+app.NewSchedulerCommand()这一部分是主要代码，查看内部实现机制：
+func NewSchedulerCommand() *cobra.Command {//返回是一个*cobra.Command对象，这里使用的是cobra库来创建一个完整的命令行客户端
+	opts, err := options.NewOptions()
+	if err != nil {
+		glog.Fatalf("unable to initialize command options: %v", err)
+	}
+
+	cmd := &cobra.Command{
+		Use: "kube-scheduler",
+		Long: `The Kubernetes scheduler is a policy-rich, topology-aware,
+workload-specific function that significantly impacts availability, performance,
+and capacity. The scheduler needs to take into account individual and collective
+resource requirements, quality of service requirements, hardware/software/policy
+constraints, affinity and anti-affinity specifications, data locality, inter-workload
+interference, deadlines, and so on. Workload-specific requirements will be exposed
+through the API as necessary.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			verflag.PrintAndExitIfRequested()
+			utilflag.PrintFlags(cmd.Flags())
+
+			if len(args) != 0 {
+				fmt.Fprint(os.Stderr, "arguments are not supported\n")
+			}
+
+			if errs := opts.Validate(); len(errs) > 0 {
+				fmt.Fprintf(os.Stderr, "%v\n", utilerrors.NewAggregate(errs))
+				os.Exit(1)
+			}
+
+			if len(opts.WriteConfigTo) > 0 {
+				if err := options.WriteConfigFile(opts.WriteConfigTo, &opts.ComponentConfig); err != nil {
+					fmt.Fprintf(os.Stderr, "%v\n", err)
+					os.Exit(1)
+				}
+				glog.Infof("Wrote configuration to: %s\n", opts.WriteConfigTo)
+				return
+			}
+
+			c, err := opts.Config()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				os.Exit(1)
+			}
+
+			stopCh := make(chan struct{})
+			if err := Run(c.Complete(), stopCh); err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				os.Exit(1)
+			}
+		},
+	}
+
+	opts.AddFlags(cmd.Flags())
+	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
+
+	return cmd
 }
