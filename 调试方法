@@ -1,3 +1,7 @@
-  搭建好kubernetes环境后，如果针对scheduler进行调试，则先停止scheduler进程，打开goland IDE，添加相应路径的项目工程（/root/go/src/k8s.io/kubernetes）,
-右键/root/go/src/k8s.io/kubernetes/cmd/kube-scheduler/scheduler.go文件 选择create go build scheduler.go或在工具栏 go build scheduler.go处点击出现 Edit Configurations点击弹出填写数据页面，在Program arguments处填写启动参数 --address=127.0.0.1 --logtostderr=false --log-dir=/var/log/kubernets --v=2 --kubeconfig=/etc/kubernetes/kube-scheduler.kubeconfig
+  搭建好kubernetes环境后，如果针对scheduler进行调试，则先停止scheduler进程。
+  打开goland IDE，添加相应路径的项目工程（/root/go/src/k8s.io/kubernetes）。
+右键/root/go/src/k8s.io/kubernetes/cmd/kube-scheduler/scheduler.go文件 选择create go build scheduler.go或在工具栏 go build scheduler.go处点击，
+出现 Edit Configurations点击弹出填写数据页面，
+在Program arguments处填写启动参数：
+--address=127.0.0.1 --logtostderr=false --log-dir=/var/log/kubernets --v=2 --kubeconfig=/etc/kubernetes/kube-scheduler.kubeconfig
 最后确定即可。
