@@ -37,9 +37,8 @@ constraints, affinity and anti-affinity specifications, data locality, inter-wor
 interference, deadlines, and so on. Workload-specific requirements will be exposed
 through the API as necessary.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			verflag.PrintAndExitIfRequested()
-			utilflag.PrintFlags(cmd.Flags())
-
+			verflag.PrintAndExitIfRequested()//如果使用了--version参数，打印version并退出程序
+			utilflag.PrintFlags(cmd.Flags())//将所有的flag打印到日志
 			if len(args) != 0 {
 				fmt.Fprint(os.Stderr, "arguments are not supported\n")
 			}
@@ -58,14 +57,14 @@ through the API as necessary.`,
 				return
 			}
 
-			c, err := opts.Config()
+			c, err := opts.Config()//生成scheduler options的config
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
 
 			stopCh := make(chan struct{})
-			if err := Run(c.Complete(), stopCh); err != nil {
+			if err := Run(c.Complete(), stopCh); err != nil {//执行scheduler
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
@@ -207,7 +206,7 @@ func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error 
 
 	// Apply algorithms based on feature gates.
 	// TODO: make configurable?
-	algorithmprovider.ApplyFeatureGates()
+	algorithmprovider.ApplyFeatureGates()//检查是否设置了TaintNodesByCondition和ResourceLimitsPriorityFunction featuregates
 
 	// Configz registration.
 	if cz, err := configz.New("componentconfig"); err == nil {
@@ -217,20 +216,20 @@ func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error 
 	}
 
 	// Build a scheduler config from the provided algorithm source.
-	schedulerConfig, err := NewSchedulerConfig(c）
+	schedulerConfig, err := NewSchedulerConfig(c）//生成scheduler的config以及对应的预选优先策略
 	if err != nil {
 		return err
 	}
 
 	// Create the scheduler.
-	sched := scheduler.NewFromConfig(schedulerConfig)
+	sched := scheduler.NewFromConfig(schedulerConfig)//将scheduler config转化成scheduler
 
 	// Prepare the event broadcaster.
 	if c.Broadcaster != nil && c.EventClient != nil {
 		c.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.EventClient.Events("")})
 	}
 
-	// Start up the healthz server.
+	// Start up the healthz server.启动交互监听器
 	if c.InsecureServing != nil {
 		separateMetrics := c.InsecureMetricsServing != nil
 		handler := buildHandlerChain(newHealthzHandler(&c.ComponentConfig, separateMetrics), nil, nil)
@@ -260,9 +259,9 @@ func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error 
 	c.InformerFactory.WaitForCacheSync(stopCh)
 	controller.WaitForCacheSync("scheduler", stopCh, c.PodInformer.Informer().HasSynced)
 
-	// Prepare a reusable run function.
+	// Prepare a reusable run function.创建可重复使用的run函数
 	run := func(ctx context.Context) {
-		sched.Run()
+		sched.Run()//此处运行调度器
 		<-ctx.Done()
 	}
 
