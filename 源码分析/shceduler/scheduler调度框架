@@ -1,9 +1,17 @@
 这是调度程序框架，用于处理调度算法之外的内容（例如绑定）
 pkg/scheduler/scheduler.go
+// Run begins watching and scheduling. It waits for cache to be synced, then starts a goroutine and returns immediately.
+func (sched *Scheduler) Run() {
+	if !sched.config.WaitForCacheSync() {
+		return
+	}
+        //一直调用sched.scheduleOne，前一次调用返回下一次调用就开始，除非channel sched.config.StopEverything被关闭
+	go wait.Until(sched.scheduleOne, 0, sched.config.StopEverything)
+}
 
 scheduleOne一次只会调度一个pod，线性调度。这样做避免一次部署多个pod后，由于cpu和内存问题，该node可能不是多个pod中的最优选择了
 func (sched *Scheduler) scheduleOne() {
-	pod := sched.config.NextPod()//获取下一个要调度的pod
+	pod := sched.config.NextPod()//获取一个要调度的pod（队列）
 	if pod.DeletionTimestamp != nil {//pod is already delete from the yaml or cache
 		sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
 		glog.V(3).Infof("Skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
@@ -14,7 +22,8 @@ func (sched *Scheduler) scheduleOne() {
 
 	// Synchronously attempt to find a fit for the pod.
 	start := time.Now()
-	suggestedHost, err := sched.schedule(pod)// schedule the pod 此处挑选pod要部署的node
+	suggestedHost, err := sched.schedule(pod)// schedule the pod 此处挑选适合pod部署的node节点,预选过程，优选过程等就是在这里面
+        //如果没有适合的node就进入抢占调度逻辑
 	if err != nil {
 		// schedule() may have failed because the pod would not fit on any host, so we try to
 		// preempt, with the expectation that the next time the pod is tried for scheduling it
@@ -29,7 +38,9 @@ func (sched *Scheduler) scheduleOne() {
 		}
 		return
 	}
+        
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
+	//告诉缓存假设一个pod现在在给定节点上运行，即使它还没有被绑定
 	// Tell the cache to assume that a pod now is running on a given node, even though it hasn't been bound yet.
 	// This allows us to keep scheduling without waiting on binding to occur.
 	assumedPod := pod.DeepCopy()
@@ -74,4 +85,43 @@ func (sched *Scheduler) scheduleOne() {
 		}
 	}()
 }
+
+//进入suggestedHost, err := sched.schedule(pod)
+// schedule implements the scheduling algorithm and returns the suggested host.
+func (sched *Scheduler) schedule(pod *v1.Pod) (string, error) {
+	host, err := sched.config.Algorithm.Schedule(pod, sched.config.NodeLister)
+	if err != nil {
+		pod = pod.DeepCopy()
+		sched.config.Error(pod, err)
+		sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "%v", err)
+		sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
+			Type:    v1.PodScheduled,
+			Status:  v1.ConditionFalse,
+			Reason:  v1.PodReasonUnschedulable,
+			Message: err.Error(),
+		})
+		return "", err
+	}
+	return host, err
+}
+///root/go/src/k8s.io/kubernetes/pkg/scheduler/algorithm/scheduler_interface.go
+//进入host, err := sched.config.Algorithm.Schedule(pod, sched.config.NodeLister)
+// ScheduleAlgorithm is an interface implemented by things that know how to schedule pods
+// onto machines.
+type ScheduleAlgorithm interface {
+	Schedule(*v1.Pod, NodeLister) (selectedMachine string, err error)// //给定pod和nodes，计算出一个适合跑pod的node并返回
+	// Preempt receives scheduling errors for a pod and tries to create room for
+	// the pod by preempting lower priority pods if possible.
+	// It returns the node where preemption happened, a list of preempted pods, a
+	// list of pods whose nominated node name should be removed, and error if any.//抢占
+	Preempt(*v1.Pod, NodeLister, error) (selectedNode *v1.Node, preemptedPods []*v1.Pod, cleanupNominatedPods []*v1.Pod, err error)
+	// Predicates() returns a pointer to a map of predicate functions. This is
+	// exposed for testing.
+	Predicates() map[string]FitPredicate//预选
+	// Prioritizers returns a slice of priority config. This is exposed for
+	// testing.
+	Prioritizers() []PriorityConfig//优选
+}
+
+
 
