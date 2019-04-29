@@ -21,3 +21,21 @@ scheduler主要涉及的文件：
 
 /root/go/src/k8s.io/kubernetes/pkg/scheduler/core/generic_scheduler.go 优选出适合在该node上创建pod的算法
 
+其它目录：
+api: swagger输出接口文档用，基本是json源码
+
+build：构建脚本文件（包含镜像）
+
+plugin：插件
+
+test：测试相关的工具
+
+third_party：第三方工具
+
+docs：使用文档
+
+Godeps：项目依赖的Go的第三方包，比如docker客户端sdk，rest等
+
+hack：工具箱，各种编译，构建，校验的脚本都在这。
+
+
