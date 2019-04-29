@@ -37,6 +37,8 @@ docs：使用文档
 
 Godeps：项目依赖的Go的第三方包，比如docker客户端sdk，rest等
 
+vendor：存储和管理外部依赖包
+
 hack：工具箱，各种编译，构建，校验的脚本都在这。
 
 
